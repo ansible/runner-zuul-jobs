@@ -9,4 +9,6 @@
     - name: Run tox
       args:
         chdir: "{{ zuul.project.src_dir }}"
+      environment:
+        PATH: "{{ ansible_env.PATH }}:{{ ansible_env.HOME }}/.local/bin"
       command: "tox"
