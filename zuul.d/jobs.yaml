@@ -10,3 +10,36 @@
       Run Tox through pipenv
     pre-run: playbooks/tox-pipenv/pre-run.yaml
     run: playbooks/tox-pipenv/run.yaml
+
+- job:
+    name: openshift-integration
+    description: |
+      An abstract job to install requirements and pull origin images.
+    pre-run: playbooks/openshift/requirements.yaml
+    abstract: yes
+    nodeset:
+      nodes:
+        - name: controller
+          label: dib-centos-7
+    # TODO: remove attempts: 1 when job is succesful
+    attempts: 1
+    vars:
+      origin_repo: centos-release-openshift-origin310
+      origin_version: v3.10
+
+# NOTE: can be moved to awx repo when ready
+- job:
+    name: openshift-awx-install
+    parent: openshift-integration
+    description: |
+      A job that test awx install on openshift
+    run: playbooks/awx/install-openshift.yaml
+    required-projects:
+      - name: ansible/awx
+        override-checkout: devel
+
+# TEMP: run the job locally
+- project:
+    check:
+      jobs:
+        - openshift-awx-install

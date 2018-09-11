@@ -1,0 +1,55 @@
+---
+- name: Remove dockerhub_base variable
+  lineinfile:
+    path: "{{ awx_src }}/installer/inventory"
+    regexp: '^dockerhub_base='
+    line: '#dockerhub_base='
+
+- name: Remove privileged command
+  lineinfile:
+    path: "{{ awx_src }}/installer/roles/kubernetes/tasks/openshift.yml"
+    regexp: '.*adm policy.*'
+    line: '    true'
+
+# Fix: Failed to pull image "registry.access.redhat.com/rhscl/postgresql-96-rhel7"
+- name: Fix postgres image location
+  replace:
+    path: "{{ awx_src }}/installer/roles/kubernetes/templates/postgresql-persistent.yml.j2"
+    regexp: 'registry.access.redhat.com.rhscl.postgresql-96-rhel7'
+    replace: 'centos/postgresql-96-centos7'
+
+- name: Set privileged context
+  command: >
+    oc --context "default/127-0-0-1:8443/system:admin" \
+      adm policy add-scc-to-user privileged system:serviceaccount:myproject:awx
+
+- name: Login with developer account
+  command: oc login -u developer -p developer
+
+- name: Grab openshift token
+  command: oc whoami -t
+  register: openshift_token
+
+- name: Install awx on openshift
+  command: >
+    ansible-playbook -i inventory \
+      -e openshift_host=127.0.0.1:8443 \
+      -e openshift_skip_tls_verify=True \
+      -e openshift_user=developer \
+      -e openshift_password=developer \
+      -e openshift_project=myproject \
+      -e kubernetes_task_image=172.30.1.1:5000/myproject/awx_task \
+      -e kubernetes_web_image=172.30.1.1:5000/myproject/awx_web \
+      -e openshift_pg_emptydir=yes \
+      -e docker_registry=172.30.1.1:5000 \
+      -e docker_registry_repository=myproject \
+      -e docker_registry_username=developer \
+      -e docker_registry_password={{ openshift_token.stdout }} \
+      install.yml
+  become: yes
+  args:
+    chdir: "{{ awx_src }}/installer"
+  environment:
+    # We need a more recent git to correctly discover awx_version
+    # The default git doesn't support --first-parent argument
+    PATH: "/opt/rh/rh-git29/root/bin/:{{ ansible_env.PATH }}"
