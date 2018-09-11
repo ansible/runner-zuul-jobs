@@ -1,0 +1,38 @@
+- hosts: controller
+  vars:
+    awx_src: "{{ ansible_env.HOME }}/src/github.com/ansible/awx"
+  pre_tasks:
+    - import_role: name=awx-build-image
+    - import_role: name=openshift-deploy
+    - import_role: name=awx-install-openshift
+  tasks:
+    - name: Verify pods are running
+      command: oc status
+
+    - name: Get route name
+      command: oc get routes/awx-web-svc "--template={{'{{'}}.spec.host {{'}}'}}"
+      register: spec_host
+
+    - name: Check web is working
+      uri:
+        url: "http://{{ spec_host.stdout }}"
+        return_content: yes
+      register: webpage
+      retries: 600
+      delay: 1
+      until: "'working...' in webpage.content"
+
+    - name: Install tower-cli
+      command: pip install --user ansible-tower-cli
+
+    - name: Configure host
+      command: "{{ ansible_env.HOME }}/.local/bin/tower-cli config host {{ spec_host.stdout }}"
+
+    - name: Login
+      command: "{{ ansible_env.HOME }}/.local/bin/tower-cli login --password password admin"
+
+    - name: Display versions
+      command: "{{ ansible_env.HOME }}/.local/bin/tower-cli version"
+
+    - name: Display roles
+      command: "{{ ansible_env.HOME }}/.local/bin/tower-cli role list"

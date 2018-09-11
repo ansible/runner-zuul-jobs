@@ -1,0 +1,10 @@
+---
+- name: Build the image
+  command: ansible-playbook -i inventory build.yml
+  become: yes
+  args:
+    chdir: "{{ awx_src }}/installer"
+  environment:
+    # We need a more recent git to correctly discover awx_version
+    # The default git doesn't support --first-parent argument
+    PATH: "/opt/rh/rh-git29/root/bin/:{{ ansible_env.PATH }}"
