@@ -1,7 +1,5 @@
 - project:
-    check:
+    check: &jobs
       jobs:
-        - linters
-    gate:
-      jobs:
-        - linters
+        - config-linters
+    gate: *jobs
